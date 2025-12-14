@@ -254,14 +254,14 @@ main(int argc, char *argv[])
   //data_block_start = bitmap_start + (sb->size / BPB) + 1;
   uint num_bitmap_blocks = (sb->nblocks / BPB) + 1;
   data_block_start = bitmap_start + num_bitmap_blocks;
-	printf("DEBUG: bitmap_start=%d, data_block_start=%d, num_bitmap_blocks=%d\n", bitmap_start, data_block_start, num_bitmap_blocks);
+	//printf("DEBUG: bitmap_start=%d, data_block_start=%d, num_bitmap_blocks=%d\n", bitmap_start, data_block_start, num_bitmap_blocks);
 	
 
 
-  printf("fs.img size: %jd\n", statb.st_size);
-  printf("fs size %d, no. of blocks %d, no. of inodes %d\n", sb->size, sb->nblocks, sb->ninodes);
-  printf("begin addr%p, begin inode %p, offset %ld\n", addr, inode_table, (char *)inode_table - addr);
-  printf("Root inode size %d links %d type %d\n", inode_table[ROOTINO].size, inode_table[ROOTINO].nlink, inode_table[ROOTINO].type);
+//  printf("fs.img size: %jd\n", statb.st_size);
+//  printf("fs size %d, no. of blocks %d, no. of inodes %d\n", sb->size, sb->nblocks, sb->ninodes);
+//  printf("begin addr%p, begin inode %p, offset %ld\n", addr, inode_table, (char *)inode_table - addr);
+//  printf("Root inode size %d links %d type %d\n", inode_table[ROOTINO].size, inode_table[ROOTINO].nlink, inode_table[ROOTINO].type);
 
   if (inode_table[ROOTINO].type == T_DIR && inode_table[ROOTINO].addrs[0] != 0)
   {
@@ -270,8 +270,8 @@ main(int argc, char *argv[])
       for (int i = 0; i < n; i++, de++)
       {
           //if (de->inum == 0) continue;
-          printf("  inum %d, name %s", de->inum, de->name);
-          printf(" -> inode size %d links %d type %d\n", inode_table[de->inum].size, inode_table[de->inum].nlink, inode_table[de->inum].type);
+//          printf("  inum %d, name %s", de->inum, de->name);
+//          printf(" -> inode size %d links %d type %d\n", inode_table[de->inum].size, inode_table[de->inum].nlink, inode_table[de->inum].type);
       }
       printf("\n");
   }
