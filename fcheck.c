@@ -55,10 +55,11 @@ uint
 int 
 is_bit_set_in_bitmap(uint block_num)
 {
-    uint bitmap_block = BBLOCK(block_num, sb->ninodes);
+		uint bit_index = block_num - data_block_start;
+    uint bitmap_block = bitmap_start + (bit_index / BPB);
     uchar *bitmap = (uchar *)(addr + bitmap_block * BLOCK_SIZE);
-    uint byte_offset = (block_num % BPB) / 8;
-    uint bit_offset = block_num % 8;
+    uint byte_offset = (bit_index % BPB) / 8;
+    uint bit_offset = bit_index % 8;
     return (bitmap[byte_offset] >> bit_offset) & 1;
 }
 
@@ -249,7 +250,12 @@ main(int argc, char *argv[])
   inode_table = (struct dinode *) (addr + IBLOCK((uint)0)*BLOCK_SIZE); 
 
   bitmap_start = BBLOCK(0, sb->ninodes);
-  data_block_start = bitmap_start + (sb->size / BPB) + 1;
+	// changing here lol
+  //data_block_start = bitmap_start + (sb->size / BPB) + 1;
+  uint num_bitmap_blocks = (sb->nblocks / BPB) + 1;
+  data_block_start = bitmap_start + num_bitmap_blocks;
+	printf("DEBUG: bitmap_start=%d, data_block_start=%d, num_bitmap_blocks=%d\n", bitmap_start, data_block_start, num_bitmap_blocks);
+	
 
 
   printf("fs.img size: %jd\n", statb.st_size);
@@ -417,10 +423,13 @@ main(int argc, char *argv[])
 
 
   // Check 6
-  for (uint block = data_block_start; block < sb->size; block++)
+ 
+	printf("DEBUG: Checking bitmap consistency from block %d to %d\n", data_block_start, data_block_start + sb->nblocks);
+  for (uint block = data_block_start; block < data_block_start + sb->nblocks; block++)
   {
       if (is_bit_set_in_bitmap(block) && block_usage[block] == 0)
       {
+					printf("DEBUG: Block %d marked in bitmap but not used\n", block);
           fprintf(stderr, "ERROR: bitmap marks block in use but it is not in use.\n");
           goto cleanup;
       }
