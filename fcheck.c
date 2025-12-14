@@ -55,9 +55,10 @@ uint
 int 
 is_bit_set_in_bitmap(uint block_num)
 {
+//maybe bad idk
 		uint bit_index = block_num - data_block_start;
     uint bitmap_block = bitmap_start + (bit_index / BPB);
-    uchar *bitmap = (uchar *)(addr + bitmap_block * BLOCK_SIZE);
+    uchar *bitmap = (uchar *)(addr + (bitmap_block * BLOCK_SIZE));
     uint byte_offset = (bit_index % BPB) / 8;
     uint bit_offset = bit_index % 8;
     return (bitmap[byte_offset] >> bit_offset) & 1;
