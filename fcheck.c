@@ -269,7 +269,7 @@ main(int argc, char *argv[])
       int n = inode_table[ROOTINO].size / sizeof(struct dirent);
       for (int i = 0; i < n; i++, de++)
       {
-          if (de->inum == 0) continue;
+          //if (de->inum == 0) continue;
           printf("  inum %d, name %s", de->inum, de->name);
           printf(" -> inode size %d links %d type %d\n", inode_table[de->inum].size, inode_table[de->inum].nlink, inode_table[de->inum].type);
       }
@@ -404,7 +404,7 @@ main(int argc, char *argv[])
               {
                 if (indirect_addrs[j] == 0) continue;
                 if (dot_inum == -1) dot_inum = find_dirent_in_block(indirect_addrs[j], ".");
-                if (dot_inum == -1) dot_inum = find_dirent_in_block(indirect_addrs[j], ".");
+                if (ddot_inum == -1) dot_inum = find_dirent_in_block(indirect_addrs[j], "..");
               }
           }
           if (dot_inum != i || ddot_inum == -1)
@@ -425,25 +425,35 @@ main(int argc, char *argv[])
 
   // Check 6
   
-	printf("DEBUG: Blocks marked as used in block_usage array:\n");
+	//printf("DEBUG: Blocks marked as used in block_usage array:\n");
 	int count = 0;
 	for (uint block = 0; block < sb->size; block++)
 	{
 		if (block_usage[block] > 0)
 		{
-			printf("  block %d, used %d times\n", block, block_usage[block]);
+			//printf("  block %d, used %d times\n", block, block_usage[block]);
 			count++;
 		}
 	}
-	printf("DEBUG: Total blocks tracked as used: %d\n", count);
+	//printf("DEBUG: Total blocks tracked as used: %d\n", count);
+
+
+	uint last_used_block = 0;
+	for (uint block = 0; block < sb->size; block++)
+	{
+		if (block_usage[block] > 0 && block > last_used_block)
+		{
+			last_used_block = block;
+		}
+	}
 
  
-	printf("DEBUG: Checking bitmap consistency from block %d to %d\n", data_block_start, data_block_start + sb->nblocks);
-  for (uint block = data_block_start; block < data_block_start + sb->nblocks; block++)
+	//printf("DEBUG: Checking bitmap consistency from block %d to %d\n", data_block_start, data_block_start + sb->nblocks);
+  for (uint block = data_block_start; block <= last_used_block; block++)
   {
       if (is_bit_set_in_bitmap(block) && block_usage[block] == 0)
       {
-					printf("DEBUG: Block %d marked in bitmap but not used\n", block);
+					//printf("DEBUG: Block %d marked in bitmap but not used\n", block);
           fprintf(stderr, "ERROR: bitmap marks block in use but it is not in use.\n");
           goto cleanup;
       }
