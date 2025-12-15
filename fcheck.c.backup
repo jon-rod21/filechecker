@@ -22,12 +22,14 @@
 #define T_FILE 2
 #define T_DEV 3
 
+#define I_BUSY 0x1
+#define I_VALID 0x2
+
 char *addr;
 struct dinode *inode_table;
 struct superblock *sb;
 uint *block_usage;
 uint *dir_ref_count;
-uint *parent_count;        
 uint data_block_start;
 uint bitmap_start;
 
@@ -35,8 +37,7 @@ uint bitmap_start;
 int
 is_valid_data_block(uint block_num)
 {
-    /* valid if within filesystem block range and not in reserved area */
-    return (block_num >= (uint)0 && block_num < sb->size && block_num >= data_block_start);
+    return block_num >= data_block_start && block_num < sb->size;
 }
 
 struct dirent 
@@ -54,12 +55,11 @@ uint
 int 
 is_bit_set_in_bitmap(uint block_num)
 {
-    /* robust version: use BBLOCK macro and BPB for indexing */
-    if (block_num >= sb->size) return 0;
-    uint bitmap_block = BBLOCK(block_num, sb->ninodes);
+//maybe bad idk
+		uint bit_index = block_num - data_block_start;
+    uint bitmap_block = bitmap_start + (bit_index / BPB);
     uchar *bitmap = (uchar *)(addr + (bitmap_block * BLOCK_SIZE));
-    uint bit_index = block_num % BPB;
-    uint byte_offset = bit_index / 8;
+    uint byte_offset = (bit_index % BPB) / 8;
     uint bit_offset = bit_index % 8;
     return (bitmap[byte_offset] >> bit_offset) & 1;
 }
@@ -92,14 +92,13 @@ check_root_directory()
 
     int dot_inum = -1, ddot_inum = -1;
 
-    /* use || so we continue until BOTH found */
-    for (int i = 0; i < NDIRECT && (dot_inum == -1 || ddot_inum == -1); i++)
+    for (int i = 0; i < NDIRECT && (dot_inum == -1 && ddot_inum == -1); i++)
     {
         if (root->addrs[i] == 0) continue;
         if (dot_inum == -1) dot_inum = find_dirent_in_block(root->addrs[i], ".");
         if (ddot_inum == -1) ddot_inum = find_dirent_in_block(root->addrs[i], "..");
     }
-    if (root->addrs[NDIRECT] != 0 && (dot_inum == -1 || ddot_inum == -1))
+    if (root-> addrs[NDIRECT] != 0 && (dot_inum == -1 || ddot_inum == -1))
     {
         uint *indirect = get_indirect_block(root->addrs[NDIRECT]);
         for (int i = 0; i < NINDIRECT && (dot_inum == -1 || ddot_inum == -1); i++)
@@ -107,6 +106,7 @@ check_root_directory()
             if (indirect[i] == 0) continue;
             if (dot_inum == -1) dot_inum = find_dirent_in_block(indirect[i], ".");
             if (ddot_inum == -1) ddot_inum = find_dirent_in_block(indirect[i], "..");
+
         }
     }
 
@@ -121,13 +121,11 @@ check_root_directory()
 void 
 count_directory_references()
 {
-    /* This counts all directory entries (for file link checking) and records parent_count for directories */
     for (uint i = 0; i < sb->ninodes; i++)
     {
         struct dinode *dip = &inode_table[i];
         if (dip->type != T_DIR) continue;
 
-        /* direct blocks */
         for (int j = 0; j < NDIRECT; j++)
         {
             if (dip->addrs[j] == 0) continue;
@@ -137,21 +135,12 @@ count_directory_references()
             {
                 if (de[k].inum != 0)
                 {
-                    uint inum = de[k].inum;
-                    if (inum < sb->ninodes) dir_ref_count[inum]++;
-                    /* if this entry is a directory and not "." then treat it as a parent link */
-                    if (inum < sb->ninodes && inode_table[inum].type == T_DIR) {
-                        /* skip "." (self) and treat ".." specially (we still count it in dir_ref_count but for parent_count we skip "..") */
-                        if (strncmp(de[k].name, ".", DIRSIZ) != 0 && strncmp(de[k].name, "..", DIRSIZ) != 0) {
-                            parent_count[inum]++;
-                        }
-                    }
+                    dir_ref_count[de[k].inum]++;
                 }
             }
 
         }
 
-        /* indirect blocks */
         if (dip->addrs[NDIRECT] != 0)
         {
             uint *indirect = get_indirect_block(dip->addrs[NDIRECT]);
@@ -164,13 +153,7 @@ count_directory_references()
                 {
                     if (de[k].inum != 0)
                     {
-                        uint inum = de[k].inum;
-                        if (inum < sb->ninodes) dir_ref_count[inum]++;
-                        if (inum < sb->ninodes && inode_table[inum].type == T_DIR) {
-                            if (strncmp(de[k].name, ".", DIRSIZ) != 0 && strncmp(de[k].name, "..", DIRSIZ) != 0) {
-                                parent_count[inum]++;
-                            }
-                        }
+                        dir_ref_count[de[k].inum]++;
                     }
                 }
             }
@@ -180,7 +163,8 @@ count_directory_references()
 
 
 
-// Check 10: ensure directory entries refer to in-use inodes
+// Check 10
+
 int
 check_directory_entry_validity()
 {
@@ -197,7 +181,7 @@ check_directory_entry_validity()
             for (int k = 0; k < entries; k++)
             {
                 if (de[k].inum == 0) continue;
-                if (de[k].inum >= sb->ninodes || inode_table[de[k].inum].type == T_UNALLOC)
+                if (inode_table[de[k].inum].type == T_UNALLOC)
                 {
                     fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
                     return 1;
@@ -216,7 +200,7 @@ check_directory_entry_validity()
                 for (int k = 0; k < entries; k++)
                 {
                     if (de[k].inum == 0) continue;
-                    if (de[k].inum >= sb->ninodes || inode_table[de[k].inum].type == T_UNALLOC)
+                    if (inode_table[de[k].inum].type == T_UNALLOC)
                     {
                         fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
                         return 1;
@@ -253,39 +237,60 @@ main(int argc, char *argv[])
     exit(ERROR_CODE);
   }
 
+  /* Dont hard code the size of file. Use fstat to get the size */
   addr = mmap(NULL, statb.st_size, PROT_READ, MAP_PRIVATE, fsfd, 0);
   if (addr == MAP_FAILED){
-      perror("mmap failed");
-      exit(1);
+	  perror("mmap failed");
+	  exit(1);
   }
 
   /* read the super block */
   sb = (struct superblock *) (addr + 1 * BLOCK_SIZE);
 
-  /* read the inodes (inode block containing inode 0) */
-  inode_table = (struct dinode *) (addr + IBLOCK((uint)0) * BLOCK_SIZE); 
+  /* read the inodes */
+  inode_table = (struct dinode *) (addr + IBLOCK((uint)0)*BLOCK_SIZE); 
 
-  /* compute bitmap start and data block start */
   bitmap_start = BBLOCK(0, sb->ninodes);
-
-  /* number of bitmap blocks = ceil(nblocks / BPB) */
-  uint num_bitmap_blocks = (sb->nblocks + BPB - 1) / BPB;
+	// changing here lol
+  //data_block_start = bitmap_start + (sb->size / BPB) + 1;
+  uint num_bitmap_blocks = (sb->nblocks / BPB) + 1;
   data_block_start = bitmap_start + num_bitmap_blocks;
+	//printf("DEBUG: bitmap_start=%d, data_block_start=%d, num_bitmap_blocks=%d\n", bitmap_start, data_block_start, num_bitmap_blocks);
+	
+
+
+//  printf("fs.img size: %jd\n", statb.st_size);
+//  printf("fs size %d, no. of blocks %d, no. of inodes %d\n", sb->size, sb->nblocks, sb->ninodes);
+//  printf("begin addr%p, begin inode %p, offset %ld\n", addr, inode_table, (char *)inode_table - addr);
+//  printf("Root inode size %d links %d type %d\n", inode_table[ROOTINO].size, inode_table[ROOTINO].nlink, inode_table[ROOTINO].type);
+
+  if (inode_table[ROOTINO].type == T_DIR && inode_table[ROOTINO].addrs[0] != 0)
+  {
+      struct dirent *de = get_dirent_block(inode_table[ROOTINO].addrs[0]);
+      int n = inode_table[ROOTINO].size / sizeof(struct dirent);
+      for (int i = 0; i < n; i++, de++)
+      {
+          //if (de->inum == 0) continue;
+//          printf("  inum %d, name %s", de->inum, de->name);
+//          printf(" -> inode size %d links %d type %d\n", inode_table[de->inum].size, inode_table[de->inum].nlink, inode_table[de->inum].type);
+      }
+      printf("\n");
+  }
+
+
 
   block_usage = calloc(sb->size, sizeof(uint));
   dir_ref_count = calloc(sb->ninodes, sizeof(uint));
-  parent_count = calloc(sb->ninodes, sizeof(uint));
-  if (!block_usage || !dir_ref_count || !parent_count)
+  if (!block_usage || !dir_ref_count)
   {
       fprintf(stderr, "Memory allocation failed\n");
       exit(ERROR_CODE);
   }
-
-  // check 3: root directory exists and formatted correctly
+  //check 3
   if (check_root_directory()) goto cleanup;
+  
 
-
-  // main loop: scan inodes and blocks
+  // main loop
   for (uint i = 0; i < sb->ninodes; i++)
   {
       struct dinode *dip = &inode_table[i];
@@ -297,11 +302,11 @@ main(int argc, char *argv[])
           goto cleanup;
       }
 
+
       // skip unallocated inodes
       if (dip->type == T_UNALLOC) continue;
 
 
-      // direct blocks
       for (int j = 0; j < NDIRECT; j++)
       {
           uint block = dip->addrs[j];
@@ -314,7 +319,7 @@ main(int argc, char *argv[])
               goto cleanup;
           }
 
-          // Check 7: direct used more than once
+          // Check 7
           if (block_usage[block] > 0)
           {
               fprintf(stderr, "ERROR: direct address used more than once.\n");
@@ -322,7 +327,7 @@ main(int argc, char *argv[])
           }
           block_usage[block]++;
 
-          // Check 5: bitmap should mark block in use
+          // Check 5
           if (!is_bit_set_in_bitmap(block))
           {
               fprintf(stderr, "ERROR: address used by inode but marked free in bitmap.\n");
@@ -330,32 +335,27 @@ main(int argc, char *argv[])
           }
       }
 
-      /* indirect block */
+      
       uint indirect = dip->addrs[NDIRECT];
       if (indirect != 0)
       {
-          /* Check 2: indirect block pointer valid */
+          // Check 2: bad indirect
           if (!is_valid_data_block(indirect))
           {
               fprintf(stderr, "ERROR: bad indirect address in inode.\n");
               goto cleanup;
           }
+          
 
-          /* Check 5: indirect block itself must be marked in bitmap */
+          // Check 5
           if (!is_bit_set_in_bitmap(indirect))
           {
               fprintf(stderr, "ERROR: address used by inode but marked free in bitmap.\n");
               goto cleanup;
           }
-          /* count the indirect block itself as used */
-          if (block_usage[indirect] > 0) {
-              /* if already used, that is still a duplicated-use; treat it like used-more-than-once */
-              fprintf(stderr, "ERROR: indirect address used more than once.\n");
-              goto cleanup;
-          }
           block_usage[indirect]++;
 
-          /* now inspect entries inside the indirect block */
+          // Check blocks pointed to by indirect block
           uint *indirect_addrs = get_indirect_block(indirect);
           for (int j = 0; j < NINDIRECT; j++)
           {
@@ -369,13 +369,14 @@ main(int argc, char *argv[])
                   goto cleanup;
               }
 
+
               // Check 8: indirect address used more than once
               if (block_usage[block] > 0)
               {
                   fprintf(stderr, "ERROR: indirect address used more than once.\n");
                   goto cleanup;
               }
-              block_usage[block]++;
+							block_usage[block]++;
 
               // Check 5
               if (!is_bit_set_in_bitmap(block))
@@ -386,7 +387,7 @@ main(int argc, char *argv[])
           }
       }
 
-      // Check 4: directory formatting ('.' and '..')
+      // Check 4
       if (dip->type == T_DIR)
       {
           int dot_inum = -1, ddot_inum = -1;
@@ -407,46 +408,62 @@ main(int argc, char *argv[])
                 if (ddot_inum == -1) ddot_inum = find_dirent_in_block(indirect_addrs[j], "..");
               }
           }
-          if (dot_inum != (int)i || ddot_inum == -1 || ddot_inum >= sb->ninodes || inode_table[ddot_inum].type != T_DIR)
+          if (dot_inum != i || ddot_inum == -1)
           {
               fprintf(stderr, "ERROR: directory not properly formatted.\n");
               goto cleanup;
           }
       }
+
+      // Check 12
+      if (dip->type == T_DIR && i != ROOTINO && dip->nlink > 1) {
+          fprintf(stderr, "ERROR: directory appears more than once in file system.\n");
+          goto cleanup;
+      }
+    
   }
 
 
-  /* Check 6: bitmap marks block in use but it is not in use.
-     We must scan the entire data-block range, not only up to last_used_block. */
-  uint first_data = data_block_start;
-  uint last_data = data_block_start + sb->nblocks; /* exclusive end */
-  for (uint block = first_data; block < last_data; block++)
+  // Check 6
+  
+	//printf("DEBUG: Blocks marked as used in block_usage array:\n");
+	int count = 0;
+	for (uint block = 0; block < sb->size; block++)
+	{
+		if (block_usage[block] > 0)
+		{
+			//printf("  block %d, used %d times\n", block, block_usage[block]);
+			count++;
+		}
+	}
+	//printf("DEBUG: Total blocks tracked as used: %d\n", count);
+
+
+	uint last_used_block = 0;
+	for (uint block = 0; block < sb->size; block++)
+	{
+		if (block_usage[block] > 0 && block > last_used_block)
+		{
+			last_used_block = block;
+		}
+	}
+
+ 
+	//printf("DEBUG: Checking bitmap consistency from block %d to %d\n", data_block_start, data_block_start + sb->nblocks);
+  for (uint block = data_block_start; block <= last_used_block; block++)
   {
       if (is_bit_set_in_bitmap(block) && block_usage[block] == 0)
       {
+					//printf("DEBUG: Block %d marked in bitmap but not used\n", block);
           fprintf(stderr, "ERROR: bitmap marks block in use but it is not in use.\n");
           goto cleanup;
       }
   }
 
 
-  /* Count directory references and parent relationships (used by checks 9,11,12) */
   count_directory_references();
-
-  /* Check 12: directory appears more than once in file system.
-     parent_count for each directory (excluding root) must be <= 1.
-     Root's parent is itself, allowed. */
-  for (uint i = 0; i < sb->ninodes; i++) {
-      if (inode_table[i].type == T_DIR) {
-          if (i == ROOTINO) continue;
-          if (parent_count[i] > 1) {
-              fprintf(stderr, "ERROR: directory appears more than once in file system.\n");
-              goto cleanup;
-          }
-      }
-  }
-
-  // Check 9: every in-use inode must be referred in at least one directory
+  
+  // Check 9
   for (uint i = 0; i < sb->ninodes; i++)
   {
       struct dinode *dip = &inode_table[i];
@@ -457,10 +474,11 @@ main(int argc, char *argv[])
       }
   }
 
-  // Check 10: directory entry validity
+  //Check 10
   if (check_directory_entry_validity()) goto cleanup;
 
-  // Check 11: reference count matches number of directory entries (for files)
+  //Check 11
+
   for (uint i = 0; i < sb->ninodes; i++)
   {
       struct dinode *dip = &inode_table[i];
@@ -473,9 +491,10 @@ main(int argc, char *argv[])
 
 cleanup:
   free(block_usage);
-  free(dir_ref_count);
-  free(parent_count);
   munmap(addr, statb.st_size);
   close(fsfd);
   return 0;
+
+
 }
+

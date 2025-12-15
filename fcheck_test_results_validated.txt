@@ -1,0 +1,210 @@
+==========================================================
+Test Case: badaddr
+Expected Result:
+ERROR: bad direct address in inode.
+----------------------------------------------------------
+ERROR: bad direct address in inode.
+
+
+
+==========================================================
+Test Case: imrkused
+Expected Result:
+ERROR: inode marked use but not found in a directory.
+----------------------------------------------------------
+ERROR: inode marked use but not found in a directory.
+
+
+
+==========================================================
+Test Case: goodlarge
+Expected Result:
+SUCCESS: File system is clean.
+----------------------------------------------------------
+
+
+
+==========================================================
+Test Case: goodrefcnt
+Expected Result:
+SUCCESS: File system is clean.
+----------------------------------------------------------
+
+
+
+==========================================================
+Test Case: addronce2
+Expected Result:
+ERROR: indirect address used more than once.
+----------------------------------------------------------
+ERROR: indirect address used more than once.
+
+
+
+==========================================================
+Test Case: badrefcnt
+Expected Result:
+ERROR: bad reference count for file.
+----------------------------------------------------------
+ERROR: bad reference count for file.
+
+
+
+==========================================================
+Test Case: mrkfree
+Expected Result:
+ERROR: address used by inode but marked free in bitmap.
+----------------------------------------------------------
+ERROR: address used by inode but marked free in bitmap.
+
+
+
+==========================================================
+Test Case: badlarge
+Expected Result:
+ERROR: directory appears more than once in file system.
+----------------------------------------------------------
+ERROR: directory appears more than once in file system.
+
+
+
+==========================================================
+Test Case: imrkfree
+Expected Result:
+ERROR: inode referred to in directory but marked free.
+----------------------------------------------------------
+ERROR: inode referred to in directory but marked free.
+
+
+
+==========================================================
+Test Case: badroot2
+Expected Result:
+ERROR: root directory does not exist.
+----------------------------------------------------------
+ERROR: root directory does not exist.
+
+
+
+==========================================================
+Test Case: dironce
+Expected Result:
+ERROR: directory appears more than once in file system.
+----------------------------------------------------------
+ERROR: directory appears more than once in file system.
+
+
+
+==========================================================
+Test Case: badroot
+Expected Result:
+ERROR: root directory does not exist.
+----------------------------------------------------------
+ERROR: root directory does not exist.
+
+
+
+==========================================================
+Test Case: addronce
+Expected Result:
+ERROR: direct address used more than once.
+----------------------------------------------------------
+ERROR: direct address used more than once.
+
+
+
+==========================================================
+Test Case: mismatch
+Expected Result:
+ERROR: directory not properly formatted.
+----------------------------------------------------------
+
+
+
+==========================================================
+Test Case: badrefcnt2
+Expected Result:
+ERROR: bad reference count for file.
+----------------------------------------------------------
+ERROR: bad reference count for file.
+
+
+
+==========================================================
+Test Case: goodrm
+Expected Result:
+SUCCESS: File system is clean.
+----------------------------------------------------------
+
+
+
+==========================================================
+Test Case: badinode
+Expected Result:
+ERROR: bad inode.
+----------------------------------------------------------
+ERROR: bad inode.
+
+
+
+==========================================================
+Test Case: badindir1
+Expected Result:
+ERROR: bad indirect address in inode.
+----------------------------------------------------------
+ERROR: bad indirect address in inode.
+
+
+
+==========================================================
+Test Case: badindir2
+Expected Result:
+ERROR: bad indirect address in inode.
+----------------------------------------------------------
+ERROR: bad indirect address in inode.
+
+
+
+==========================================================
+Test Case: good
+Expected Result:
+SUCCESS: File system is clean.
+----------------------------------------------------------
+
+
+
+==========================================================
+Test Case: mrkused
+Expected Result:
+ERROR: bitmap marks block in use but it is not in use.
+----------------------------------------------------------
+ERROR: bitmap marks block in use but it is not in use.
+
+
+
+==========================================================
+Test Case: goodlink
+Expected Result:
+SUCCESS: File system is clean.
+----------------------------------------------------------
+
+
+
+==========================================================
+Test Case: indirfree
+Expected Result:
+ERROR: address used by inode but marked free in bitmap.
+----------------------------------------------------------
+ERROR: address used by inode but marked free in bitmap.
+
+
+
+==========================================================
+Test Case: badfmt
+Expected Result:
+ERROR: directory not properly formatted.
+----------------------------------------------------------
+ERROR: directory not properly formatted.
+
+
+
