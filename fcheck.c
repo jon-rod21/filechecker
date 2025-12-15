@@ -9,8 +9,8 @@
 #include <assert.h>
 #include <stdbool.h>
 
-#include "xv6/include/types.h"
-#include "xv6/include/fs.h"
+#include "types.h"
+#include "fs.h"
 
 #define BLOCK_SIZE (BSIZE)
 #define ERROR_CODE 1
@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
     
     if (argc < 2)
     {
-        fprintf(stderr, "Usage: sample fs.img ...\n");
+        fprintf(stderr, "Usage: fcheck <file_system_image>\n");
         exit(ERROR_CODE);
     }
     
