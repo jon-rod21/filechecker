@@ -20,7 +20,6 @@
 #define T_FILE 2
 #define T_DEV 3
 
-// Global pointers to the memory-mapped filesystem image
 char *addr;                    // Base address of the mapped filesystem
 struct dinode *inode_table;    // Pointer to the inode table
 struct superblock *sb;         // Pointer to the superblock
@@ -34,10 +33,9 @@ uint *parent_count;            // Counts how many parent directories reference e
 uint data_block_start;         // First block number where data blocks begin
 uint bitmap_start;             // First block number where the bitmap begins
 
-// Check if a block number points to a valid data block
 int is_valid_data_block(uint block_num)
 {
-    // Block must be within filesystem bounds and in the data region
+    // Block must be within bounds and in data region
     return (block_num >= (uint)0 && block_num < sb->size && block_num >= data_block_start);
 }
 
@@ -47,7 +45,7 @@ struct dirent *get_dirent_block(uint block_num)
     return (struct dirent *)(addr + block_num * BLOCK_SIZE);
 }
 
-// Get a pointer to an indirect block (which contains block addresses)
+// Get a pointer to an indirect block 
 uint *get_indirect_block(uint block_num)
 {
     return (uint *)(addr + block_num * BLOCK_SIZE);
@@ -93,7 +91,6 @@ int check_root_directory()
 {
     struct dinode *root = &inode_table[ROOTINO];
     
-    // Root must be a directory
     if (root->type != T_DIR)
     {
         fprintf(stderr, "ERROR: root directory does not exist.\n");
@@ -102,8 +99,7 @@ int check_root_directory()
     
     int dot_inum = -1, ddot_inum = -1;
     
-    // Search for "." and ".." entries in direct blocks
-    // Keep searching until we find both
+    // Search for . and .. entries in direct blocks, keep searching until both are found
     for (int i = 0; i < NDIRECT && (dot_inum == -1 || ddot_inum == -1); i++)
     {
         if (root->addrs[i] == 0) continue;
@@ -111,7 +107,7 @@ int check_root_directory()
         if (ddot_inum == -1) ddot_inum = find_dirent_in_block(root->addrs[i], "..");
     }
     
-    // If we haven't found both yet, check the indirect block
+    // Check indirect block if both arent found yet
     if (root->addrs[NDIRECT] != 0 && (dot_inum == -1 || ddot_inum == -1))
     {
         uint *indirect = get_indirect_block(root->addrs[NDIRECT]);
@@ -123,7 +119,7 @@ int check_root_directory()
         }
     }
     
-    // For root, both "." and ".." should point to root itself
+    // For root, both . and .. should point to root itself
     if (dot_inum != ROOTINO || ddot_inum != ROOTINO)
     {
         fprintf(stderr, "ERROR: root directory does not exist.\n");
@@ -134,7 +130,7 @@ int check_root_directory()
 }
 
 // Count how many times each inode is referenced in directories
-// Also tracks parent counts for directories (excluding "." and "..")
+// Also tracks parent counts for directories, not including . and ..
 void count_directory_references()
 {
     // Scan through all directory inodes
@@ -160,8 +156,7 @@ void count_directory_references()
                     // Count all directory references
                     if (inum < sb->ninodes) dir_ref_count[inum]++;
                     
-                    // For directories, also track parent relationships
-                    // Skip "." (self-reference) and ".." (parent reference)
+                    // For directories, also track parent relationships, skip . and .. for self reference
                     if (inum < sb->ninodes && inode_table[inum].type == T_DIR)
                     {
                         if (strncmp(de[k].name, ".", DIRSIZ) != 0 && 
@@ -274,7 +269,6 @@ int main(int argc, char *argv[])
         exit(ERROR_CODE);
     }
     
-    // Open the filesystem image
     fsfd = open(argv[1], O_RDONLY);
     if (fsfd < 0)
     {
@@ -282,14 +276,12 @@ int main(int argc, char *argv[])
         exit(ERROR_CODE);
     }
     
-    // Get the file size
     if (fstat(fsfd, &statb) == -1)
     {
         perror("fstat");
         exit(ERROR_CODE);
     }
     
-    // Memory-map the entire filesystem image for easy access
     addr = mmap(NULL, statb.st_size, PROT_READ, MAP_PRIVATE, fsfd, 0);
     if (addr == MAP_FAILED)
     {
@@ -297,7 +289,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    // Read the superblock (located at block 1)
     sb = (struct superblock *)(addr + 1 * BLOCK_SIZE);
     
     // Get pointer to the inode table (starts at block 2)
@@ -305,7 +296,7 @@ int main(int argc, char *argv[])
     
     // Calculate where the bitmap and data blocks start
     bitmap_start = BBLOCK(0, sb->ninodes);
-    uint num_bitmap_blocks = (sb->nblocks + BPB - 1) / BPB;  // Round up division
+    uint num_bitmap_blocks = (sb->nblocks + BPB - 1) / BPB;  
     data_block_start = bitmap_start + num_bitmap_blocks;
     
     // Allocate tracking arrays
@@ -367,7 +358,7 @@ int main(int argc, char *argv[])
             }
         }
         
-        // Check the indirect block (if present)
+        // Check the indirect block 
         uint indirect = dip->addrs[NDIRECT];
         if (indirect != 0)
         {
@@ -393,7 +384,7 @@ int main(int argc, char *argv[])
             }
             block_usage[indirect]++;
             
-            // Now check all the blocks pointed to by the indirect block
+            // Check all the blocks pointed to by the indirect block
             uint *indirect_addrs = get_indirect_block(indirect);
             for (int j = 0; j < NINDIRECT; j++)
             {
@@ -429,7 +420,7 @@ int main(int argc, char *argv[])
         {
             int dot_inum = -1, ddot_inum = -1;
             
-            // Look for "." and ".." in direct blocks
+            // Look for . and .. in direct blocks
             for (int j = 0; j < NDIRECT && (dot_inum == -1 || ddot_inum == -1); j++)
             {
                 if (dip->addrs[j] == 0) continue;
@@ -437,7 +428,7 @@ int main(int argc, char *argv[])
                 if (ddot_inum == -1) ddot_inum = find_dirent_in_block(dip->addrs[j], "..");
             }
             
-            // Check indirect blocks if we haven't found both yet
+            // Check indirect blocks if both arent found yet
             if (dip->addrs[NDIRECT] != 0 && (dot_inum == -1 || ddot_inum == -1))
             {
                 uint *indirect_addrs = get_indirect_block(dip->addrs[NDIRECT]);
@@ -449,7 +440,7 @@ int main(int argc, char *argv[])
                 }
             }
             
-            // "." must point to this directory, ".." must exist and point to a valid directory
+            // . must point to this directory, .. must exist and point to a valid directory
             if (dot_inum != (int)i || ddot_inum == -1 || 
                 ddot_inum >= sb->ninodes || inode_table[ddot_inum].type != T_DIR)
             {
@@ -473,7 +464,7 @@ int main(int argc, char *argv[])
         }
     }
     
-    // Count all directory references (needed for checks 9, 11, and 12)
+    // Count all directory references, needed for checks 9, 11, and 12
     count_directory_references();
     
     // Check 12: Directories should only appear in one parent directory
@@ -481,7 +472,7 @@ int main(int argc, char *argv[])
     {
         if (inode_table[i].type == T_DIR)
         {
-            // Root is special - it's its own parent, so skip it
+            // Root is its own parent so skip it
             if (i == ROOTINO) continue;
             
             // Each non-root directory should appear in exactly one parent
@@ -519,7 +510,6 @@ int main(int argc, char *argv[])
     }
     
 cleanup:
-    // Clean up allocated memory and unmap the filesystem image
     free(block_usage);
     free(dir_ref_count);
     free(parent_count);
